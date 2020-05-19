@@ -19,12 +19,20 @@ menu = OrderedDict([
     ('s', search_inventory),
 ])
 
+product_labels = OrderedDict([
+    ('n', 'Product Name: '),
+    ('p', 'Price: '),
+    ('q', 'Quantity: '),
+    ('d', 'Updated: '),
+    ('id', 'ID Number: '),
+])
+
 class Product(Model):
-    product_id = #peewee's built in primary_key function
-    product_name = #name of the product
-    product_quantity = #quantity as int
-    product_price = #price in cents as int
-    date_updated = #datetime when product was updated month/day/year
+    product_id = AutoField()
+    product_name = TextField()
+    product_quantity = IntegerField(default=0)
+    product_price = IntegerField(default=0)
+    date_updated = DateTimeField(default=datetime.datetime.now)
 
     class Meta:
         database = db
@@ -41,10 +49,9 @@ def add_inventory_csv():
         rows = list(inv_reader)
         for row in rows[1:]:
             Product.create(product_name=row['product'],
-                           product_quantity=row['product_quantity'],
-                           product_price=int(row['product_price'].replace('$', '') * 100),
-                           date_updated=row['date_updated'])
-
+                           product_quantity=int(row['product_quantity']),
+                           product_price=int(float(row['product_price'].replace('$', '')) * 100),
+                           date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y'))
 
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear' )
@@ -73,6 +80,18 @@ def menu_loop():
 
 def view_inventory(search=None):
     """View an item in inventory"""
+    items = Product.select().order_by(Product.product_id)
+    if search:
+        items = items.where(Product.content.contains(search))
+
+    for item in items:
+        date = item.date_updated.strftime('%m/%d/%Y')
+        print('{}{} {}{}'.format(product_labels['n'], item.product_name, product_labels['id'], item.product_id))
+        print('-' * (len(item.product_name) + len(product_labels['n']) + len(product_labels['id']) + len(item.product_id) + 1))
+        print('{}${}'.format(product_labels['p'], float(item.product_price) / 100))
+        print('{}{}'.format(product_labels['q'], item.product_quantity))
+        print('{}{}'.format(product_labels['d'], date))
+
 
 def search_inventory():
     """Search inventory"""
