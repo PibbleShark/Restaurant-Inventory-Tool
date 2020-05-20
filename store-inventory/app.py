@@ -6,6 +6,9 @@ import os
 import csv
 
 from peewee import *
+from playhouse.shortcuts import model_to_dict
+
+# suggested by Peter Wood https://stackoverflow.com/questions/53850558/return-single-peewee-record-as-dict
 
 db = SqliteDatabase('inventory.db')
 
@@ -17,6 +20,7 @@ product_labels = OrderedDict([
     ('id', 'ID Number: '),
 ])
 
+
 class Product(Model):
     product_id = AutoField()
     product_name = TextField()
@@ -27,10 +31,12 @@ class Product(Model):
     class Meta:
         database = db
 
+
 def initialize():
     """Create the database and the table."""
     db.connect()
     db.create_tables([Product], safe=True)
+
 
 def add_inventory_csv():
     """Open and add inventory items from inventory.csv"""
@@ -44,8 +50,10 @@ def add_inventory_csv():
                            date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
                            )
 
+
 def clear():
-    os.system('cls' if os.name == 'nt' else 'clear' )
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 
 def menu_loop():
     """Show the menu"""
@@ -75,6 +83,7 @@ def menu_loop():
             print(err)
             continue
 
+
 def view_inventory(search=None):
     """View an item in inventory"""
     items = Product.select().order_by(Product.product_id)
@@ -85,7 +94,8 @@ def view_inventory(search=None):
         date = item.date_updated.strftime('%m/%d/%Y')
         clear()
         print('{}{} {}{}'.format(product_labels['n'], item.product_name, product_labels['id'], item.product_id))
-        print('-' * (len(item.product_name) + len(product_labels['n']) + len(product_labels['id']) + len(item.product_id) + 1))
+        print('-' * (len(item.product_name) + len(product_labels['n']) + len(product_labels['id']) + len(
+            item.product_id) + 1))
         print('{}${}'.format(product_labels['p'], float(item.product_price) / 100))
         print('{}{}'.format(product_labels['q'], item.product_quantity))
         print('{}{}'.format(product_labels['d'], date))
@@ -93,17 +103,21 @@ def view_inventory(search=None):
         action = input('Press enter to view next entry or [M]enu view menu  ')
         if return_to_menu(action):
             break
+        elif action.lower() == 'd' or action.lower() == 'delete':
+            delete_item(item)
+
 
 def search_inventory():
     """Search inventory"""
     view_inventory(input('Item contains: '))
+
 
 def add_item():
     """Add an item to inventory"""
     clear()
     print('Enter and appropriate value for each field'
           'Enter [M]enu to return to the main menu'
-    )
+          )
     while True:
         name = input(product_labels['n'])
         if return_to_menu(name):
@@ -127,27 +141,44 @@ def add_item():
             print('quantity must be a number')
             continue
         Product.create(
-            product_name = name,
-            product_quantity = quantity,
-            product_price = int(float(price) * 100)
+            product_name=name,
+            product_quantity=quantity,
+            product_price=int(float(price) * 100)
         )
         print('Your item has been added to the inventory')
+
 
 def return_to_menu(arg):
     """Checks a variable to see if it prompts a return to the menu"""
     if arg.lower() == 'm' or arg.lower() == 'menu':
         return True
 
+
 def create_backup():
-    """Create a backup of the inventory"""
-    #write a csv file
+    """Create a backup of the inventory as CSV"""
+    dicts = [model_to_dict(item) for item in Product.select().order_by(Product.product_id)]
+
+    with open('inventory_backup.csv', 'a') as csv_file:
+        fieldnames = ['product_id',
+                      'product_name',
+                      'product_price',
+                      'product_quantity',
+                      'date_updated']
+        inventory_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+        inventory_writer.writeheader()
+        inventory_writer.writerows(dicts)
+
 
 def delete_item(item):
     """Delete an item from the inventory"""
-    delete_check = input('You want to delete this item? enter [Y]es to proceed  '):
+    delete_check = input('You want to delete this item? enter [Y]es to proceed  ')
     if delete_check.lower() == 'y' or delete_check.lower() == 'yes':
         item.delete_instance()
         print('Entry deleted')
 
+
 if __name__ == '__main__':
-    
+    initialize()
+    add_inventory_csv()
+    menu_loop()
