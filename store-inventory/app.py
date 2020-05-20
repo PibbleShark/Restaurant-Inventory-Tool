@@ -2,22 +2,12 @@
 
 from collections import OrderedDict
 import datetime
-import sys
 import os
 import csv
-
-
 
 from peewee import *
 
 db = SqliteDatabase('inventory.db')
-
-menu = OrderedDict([
-    ('a', add_item),
-    ('v', view_inventory),
-    ('b', create_backup),
-    ('s', search_inventory),
-])
 
 product_labels = OrderedDict([
     ('n', 'Product Name: '),
@@ -51,7 +41,8 @@ def add_inventory_csv():
             Product.create(product_name=row['product'],
                            product_quantity=int(row['product_quantity']),
                            product_price=int(float(row['product_price'].replace('$', '')) * 100),
-                           date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y'))
+                           date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
+                           )
 
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear' )
@@ -59,6 +50,12 @@ def clear():
 def menu_loop():
     """Show the menu"""
     entry = None
+    menu = OrderedDict([
+        ('a', add_item),
+        ('v', view_inventory),
+        ('b', create_backup),
+        ('s', search_inventory),
+    ])
 
     while entry != 'q':
         clear()
@@ -86,30 +83,71 @@ def view_inventory(search=None):
 
     for item in items:
         date = item.date_updated.strftime('%m/%d/%Y')
+        clear()
         print('{}{} {}{}'.format(product_labels['n'], item.product_name, product_labels['id'], item.product_id))
         print('-' * (len(item.product_name) + len(product_labels['n']) + len(product_labels['id']) + len(item.product_id) + 1))
         print('{}${}'.format(product_labels['p'], float(item.product_price) / 100))
         print('{}{}'.format(product_labels['q'], item.product_quantity))
         print('{}{}'.format(product_labels['d'], date))
 
+        action = input('Press enter to view next entry or [M]enu view menu  ')
+        if return_to_menu(action):
+            break
 
 def search_inventory():
     """Search inventory"""
-    #adding a search for empty fields
+    view_inventory(input('Item contains: '))
 
 def add_item():
     """Add an item to inventory"""
-    #create an inventory item according to dict keys
-    #do not require all fields
+    clear()
+    print('Enter and appropriate value for each field'
+          'Enter [M]enu to return to the main menu'
+    )
+    while True:
+        name = input(product_labels['n'])
+        if return_to_menu(name):
+            break
+        try:
+            price = input(product_labels['p'])
+            if return_to_menu(price):
+                break
+            elif not isinstance(price, (int, float)):
+                raise ValueError
+        except ValueError:
+            print('price entry must be a number')
+            continue
+        try:
+            quantity = input(product_labels['q'])
+            if return_to_menu(quantity):
+                break
+            elif not isinstance(quantity, (int, float)):
+                raise ValueError
+        except ValueError:
+            print('quantity must be a number')
+            continue
+        Product.create(
+            product_name = name,
+            product_quantity = quantity,
+            product_price = int(float(price) * 100)
+        )
+        print('Your item has been added to the inventory')
+
+def return_to_menu(arg):
+    """Checks a variable to see if it prompts a return to the menu"""
+    if arg.lower() == 'm' or arg.lower() == 'menu':
+        return True
 
 def create_backup():
     """Create a backup of the inventory"""
-    #create a backup CSV
+    #write a csv file
 
-
+def delete_item(item):
+    """Delete an item from the inventory"""
+    delete_check = input('You want to delete this item? enter [Y]es to proceed  '):
+    if delete_check.lower() == 'y' or delete_check.lower() == 'yes':
+        item.delete_instance()
+        print('Entry deleted')
 
 if __name__ == '__main__':
-
-    #run database menu
-
-
+    
