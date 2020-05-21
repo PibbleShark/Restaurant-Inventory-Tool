@@ -4,6 +4,7 @@ from collections import OrderedDict
 import datetime
 import os
 import csv
+import math
 
 from peewee import *
 from playhouse.shortcuts import model_to_dict
@@ -23,7 +24,7 @@ product_labels = OrderedDict([
 
 class Product(Model):
     product_id = AutoField()
-    product_name = TextField()
+    product_name = CharField(unique=True)
     product_quantity = IntegerField(default=0)
     product_price = IntegerField(default=0)
     date_updated = DateTimeField(default=datetime.datetime.now)
@@ -43,16 +44,23 @@ def add_inventory_csv():
     with open('inventory.csv', newline='') as csv_file:
         inv_reader = csv.DictReader(csv_file, delimiter=',')
         rows = list(inv_reader)
-        for row in rows[1:]:
-            Product.create(product_name=row['product'],
-                           product_quantity=int(row['product_quantity']),
-                           product_price=int(float(row['product_price'].replace('$', '')) * 100),
-                           date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
-                           )
+        for row in rows:
+            try:
+                Product.create(product_name=row['product_name'],
+                               product_quantity=int(row['product_quantity']),
+                               product_price=int(math.ceil(float(row['product_price'].replace('$', '')) * 100)),
+                               date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
+                               )
+            except IntegrityError:
+                inventory_item = Product.get(product_name=row['product_name'])
+                inventory_item.product_quantity = int(row['product_quantity'])
+                inventory_item.product_price = int(math.ceil(float(row['product_price'].replace('$', '')) * 100))
+                inventory_item.date_updated = datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
+                inventory_item.save()
 
 
 def clear():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    return os.system('cls' if os.name == 'nt' else 'clear')
 
 
 def menu_loop():
@@ -67,13 +75,15 @@ def menu_loop():
 
     while entry != 'q':
         clear()
-        print("enter 'q' to quit.")
+        print('\n', "Inventory Menu")
+        print('-' * 16, '\n')
         for key, value in menu.items():
             print('{}: {}'.format(key, value.__doc__))
+        print('q: Quit')
         entry = input('What would you like to do?  ').lower().strip()
 
         try:
-            if entry not in menu:
+            if entry.lower() != 'q' and entry not in menu:
                 clear()
                 raise ValueError("That is not a valid entry")
             else:
@@ -88,15 +98,15 @@ def view_inventory(search=None):
     """View an item in inventory"""
     items = Product.select().order_by(Product.product_id)
     if search:
-        items = items.where(Product.content.contains(search))
+        items = items.where(Product.product_name.contains(search))
 
     for item in items:
         date = item.date_updated.strftime('%m/%d/%Y')
         clear()
-        print('{}{} {}{}'.format(product_labels['n'], item.product_name, product_labels['id'], item.product_id))
-        print('-' * (len(item.product_name) + len(product_labels['n']) + len(product_labels['id']) + len(
-            item.product_id) + 1))
-        print('{}${}'.format(product_labels['p'], float(item.product_price) / 100))
+        print('{}'.format(item.product_name))
+        print('-' * len(item.product_name))
+        print('{}{}'.format(product_labels['id'], item.product_id))
+        print('{}${}'.format(product_labels['p'], float(item.product_price / 100)))
         print('{}{}'.format(product_labels['q'], item.product_quantity))
         print('{}{}'.format(product_labels['d'], date))
 
@@ -114,38 +124,75 @@ def search_inventory():
 
 def add_item():
     """Add an item to inventory"""
+
+    def print_database_keys(nm=None, pr=None, qnt=None):
+        if nm is None:
+            nm1 = ''
+        else:
+            nm1 = nm
+        if pr is None:
+            pr1 = ''
+        else:
+            pr1 = pr
+        if qnt is None:
+            qnt1 = ''
+        else:
+            qnt1 = qnt
+
+        return print(f"""
+            {product_labels['n']} {nm1}
+            {product_labels['p']} {pr1}
+            {product_labels['q']} {qnt1}
+        """)
+
     clear()
-    print('Enter and appropriate value for each field'
+    print('Enter an appropriate value for each field'
           'Enter [M]enu to return to the main menu'
           )
+    print_database_keys()
+
+    name = input(product_labels['n'])
+    if return_to_menu(name):
+        menu_loop()
+    clear()
+    print_database_keys(name)
+
     while True:
-        name = input(product_labels['n'])
-        if return_to_menu(name):
-            break
         try:
             price = input(product_labels['p'])
             if return_to_menu(price):
-                break
-            elif not isinstance(price, (int, float)):
-                raise ValueError
+                menu_loop()
+            price = float(price)
         except ValueError:
-            print('price entry must be a number')
-            continue
+            print('the price must be a number')
+        else:
+            print_database_keys(name, price)
+            break
+
+    while True:
         try:
             quantity = input(product_labels['q'])
             if return_to_menu(quantity):
-                break
-            elif not isinstance(quantity, (int, float)):
-                raise ValueError
+                menu_loop()
+            quantity = float(quantity)
         except ValueError:
-            print('quantity must be a number')
-            continue
+            print('the quantity must be a number')
+        else:
+            print_database_keys(name, price, quantity)
+            break
+
+    try:
         Product.create(
             product_name=name,
             product_quantity=quantity,
-            product_price=int(float(price) * 100)
+            product_price=int(math.ceil(float(price) * 100))
         )
         print('Your item has been added to the inventory')
+    except IntegrityError:
+        inventory_item = Product.get(product_name=row['product_name'])
+        inventory_item.product_quantity = int(row['product_quantity'])
+        inventory_item.product_price = int(math.ceil(float(row['product_price'].replace('$', '')) * 100))
+        inventory_item.save()
 
 
 def return_to_menu(arg):
