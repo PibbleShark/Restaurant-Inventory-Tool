@@ -7,7 +7,6 @@ import csv
 
 from peewee import *
 from playhouse.shortcuts import model_to_dict
-
 # suggested by Peter Wood https://stackoverflow.com/questions/53850558/return-single-peewee-record-as-dict
 
 db = SqliteDatabase('inventory.db')
@@ -69,7 +68,7 @@ def menu_loop():
         ('a', add_item),
         ('v', view_inventory),
         ('b', create_backup),
-        ('s', search_inventory),
+        ('s', search_inventory_name),
     ])
 
     while entry != 'q':
@@ -78,7 +77,7 @@ def menu_loop():
         print('-' * 16, '\n')
         for key, value in menu.items():
             print('{}: {}'.format(key, value.__doc__))
-        print('q: Quit','\n')
+        print('q: Quit', '\n')
         entry = input('What would you like to do?  ').lower().strip()
 
         try:
@@ -93,11 +92,22 @@ def menu_loop():
             continue
 
 
-def view_inventory(search=None):
+def view_inventory(name_search=None):
     """View an item in inventory"""
     items = Product.select().order_by(Product.product_id)
-    if search:
-        items = items.where(Product.product_name.contains(search))
+    if name_search:
+        items = items.where(Product.product_name.contains(name_search))
+    while True:
+        try:
+            num = input('Enter Product ID: ')
+            items = items.where(Product.product_id == num)
+            if items:
+                break
+            else:
+                raise ValueError('Your entry does not correspond to any item in this database')
+        except ValueError as err:
+            print(err)
+            view_inventory()
 
     for item in items:
         date = item.date_updated.strftime('%m/%d/%Y')
@@ -111,22 +121,24 @@ def view_inventory(search=None):
         print('{}{}'.format(product_labels['q'], item.product_quantity))
         print('{}{}'.format(product_labels['d'], date), '\n')
 
-        action = input('Press enter to view next entry or [M]enu view menu  ')
+        action = input('Press enter to view another entry, [D]elete to delete entry, or [M]enu view menu  ')
         if return_to_menu(action):
-            break
+            menu_loop()
         elif action.lower() == 'd' or action.lower() == 'delete':
             delete_item(item)
+        else:
+            view_inventory()
 
 
-def search_inventory():
-    """Search inventory"""
-    view_inventory(input('Product name contains: '))
+def search_inventory_name():
+    """Search inventory by name"""
+    view_inventory(name_search=input('Product name contains: '))
 
 
 def add_item():
     """Add an item to inventory"""
 
-    def print_database_keys(nm=None, pr=None, qnt=None):
+    def print_database_keys(nm=None, qnt=None, pr=None):
         if nm is None:
             nm1 = ''
         else:
@@ -142,8 +154,8 @@ def add_item():
 
         return print(f"""
             {product_labels['n']} {nm1}
-            {product_labels['p']} {pr1}
             {product_labels['q']} {qnt1}
+            {product_labels['p']} {pr1}
         """)
 
     clear()
@@ -160,18 +172,6 @@ def add_item():
 
     while True:
         try:
-            price = input(product_labels['p'])
-            if return_to_menu(price):
-                menu_loop()
-            price = float(price)
-        except ValueError:
-            print('the price must be a number')
-        else:
-            print_database_keys(name, price)
-            break
-
-    while True:
-        try:
             quantity = input(product_labels['q'])
             if return_to_menu(quantity):
                 menu_loop()
@@ -179,13 +179,25 @@ def add_item():
         except ValueError:
             print('the quantity must be a number')
         else:
-            print_database_keys(name, price, quantity)
+            print_database_keys(name, quantity)
+            break
+
+    while True:
+        try:
+            price = input(product_labels['p'])
+            if return_to_menu(price):
+                menu_loop()
+            price = float(price)
+        except ValueError:
+            print('the price must be a number')
+        else:
+            print_database_keys(name, quantity, price)
             break
 
     try:
         Product.create(
             product_name=name,
-            product_quantity=quantity,
+            product_quantity=int(quantity),
             product_price=int(round(float(price) * 100))
         )
         print('Your item has been added to the inventory')
@@ -209,7 +221,7 @@ def create_backup():
         item['product_price'] = '${:,.2f}'.format(float(item['product_price']) / 100)
         item['date_updated'] = item['date_updated'].strftime('%m/%d/%Y')
 
-    with open('inventory_backup.csv', 'a') as csv_file:
+    with open('backup.csv', 'a') as csv_file:
         fieldnames = ['product_id',
                       'product_name',
                       'product_price',
@@ -219,7 +231,7 @@ def create_backup():
         inventory_writer.writeheader()
         inventory_writer.writerows(dicts)
         clear()
-        print('Inventory backup as inventory_backup.csv has been created')
+        print('Inventory backup as backup.csv has been created')
 
 
 def delete_item(item):
