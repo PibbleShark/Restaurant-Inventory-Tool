@@ -4,7 +4,6 @@ from collections import OrderedDict
 import datetime
 import os
 import csv
-import math
 
 from peewee import *
 from playhouse.shortcuts import model_to_dict
@@ -48,13 +47,13 @@ def add_inventory_csv():
             try:
                 Product.create(product_name=row['product_name'],
                                product_quantity=int(row['product_quantity']),
-                               product_price=int(math.ceil(float(row['product_price'].replace('$', '')) * 100)),
+                               product_price=int(round(float(row['product_price'].replace('$', '')) * 100)),
                                date_updated=datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
                                )
             except IntegrityError:
                 inventory_item = Product.get(product_name=row['product_name'])
                 inventory_item.product_quantity = int(row['product_quantity'])
-                inventory_item.product_price = int(math.ceil(float(row['product_price'].replace('$', '')) * 100))
+                inventory_item.product_price = int(round(float(row['product_price'].replace('$', '')) * 100))
                 inventory_item.date_updated = datetime.datetime.strptime(row['date_updated'], '%m/%d/%Y')
                 inventory_item.save()
 
@@ -79,7 +78,7 @@ def menu_loop():
         print('-' * 16, '\n')
         for key, value in menu.items():
             print('{}: {}'.format(key, value.__doc__))
-        print('q: Quit')
+        print('q: Quit','\n')
         entry = input('What would you like to do?  ').lower().strip()
 
         try:
@@ -103,12 +102,14 @@ def view_inventory(search=None):
     for item in items:
         date = item.date_updated.strftime('%m/%d/%Y')
         clear()
-        print('{}'.format(item.product_name))
+
+        print('\n', '{}'.format(item.product_name))
         print('-' * len(item.product_name))
         print('{}{}'.format(product_labels['id'], item.product_id))
-        print('{}${}'.format(product_labels['p'], float(item.product_price / 100)))
+        print('{}${:,.2f}'.format(product_labels['p'], float(item.product_price / 100)))
+        # https://kite.com/python/answers/how-to-format-a-float-as-currency-in-python
         print('{}{}'.format(product_labels['q'], item.product_quantity))
-        print('{}{}'.format(product_labels['d'], date))
+        print('{}{}'.format(product_labels['d'], date), '\n')
 
         action = input('Press enter to view next entry or [M]enu view menu  ')
         if return_to_menu(action):
@@ -119,7 +120,7 @@ def view_inventory(search=None):
 
 def search_inventory():
     """Search inventory"""
-    view_inventory(input('Item contains: '))
+    view_inventory(input('Product name contains: '))
 
 
 def add_item():
@@ -185,13 +186,13 @@ def add_item():
         Product.create(
             product_name=name,
             product_quantity=quantity,
-            product_price=int(math.ceil(float(price) * 100))
+            product_price=int(round(float(price) * 100))
         )
         print('Your item has been added to the inventory')
     except IntegrityError:
-        inventory_item = Product.get(product_name=row['product_name'])
-        inventory_item.product_quantity = int(row['product_quantity'])
-        inventory_item.product_price = int(math.ceil(float(row['product_price'].replace('$', '')) * 100))
+        inventory_item = Product.get(product_name=name)
+        inventory_item.product_quantity = int(quantity)
+        inventory_item.product_price = int(round(float(price) * 100))
         inventory_item.save()
 
 
@@ -204,6 +205,9 @@ def return_to_menu(arg):
 def create_backup():
     """Create a backup of the inventory as CSV"""
     dicts = [model_to_dict(item) for item in Product.select().order_by(Product.product_id)]
+    for item in dicts:
+        item['product_price'] = '${:,.2f}'.format(float(item['product_price']) / 100)
+        item['date_updated'] = item['date_updated'].strftime('%m/%d/%Y')
 
     with open('inventory_backup.csv', 'a') as csv_file:
         fieldnames = ['product_id',
@@ -212,9 +216,10 @@ def create_backup():
                       'product_quantity',
                       'date_updated']
         inventory_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-
         inventory_writer.writeheader()
         inventory_writer.writerows(dicts)
+        clear()
+        print('Inventory backup as inventory_backup.csv has been created')
 
 
 def delete_item(item):
