@@ -97,17 +97,19 @@ def view_inventory(name_search=None):
     items = Product.select().order_by(Product.product_id)
     if name_search:
         items = items.where(Product.product_name.contains(name_search))
-    while True:
-        try:
-            num = input('Enter Product ID: ')
-            items = items.where(Product.product_id == num)
-            if items:
-                break
-            else:
-                raise ValueError('Your entry does not correspond to any item in this database')
-        except ValueError as err:
-            print(err)
-            view_inventory()
+
+    else:
+        while True:
+            try:
+                num = input('Enter Product ID: ')
+                items = Product.select().order_by(Product.product_id).where(Product.product_id == num)
+                if items:
+                    break
+                else:
+                    raise ValueError('Your entry does not correspond to any item in this database')
+            except ValueError as err:
+                print(err)
+                view_inventory()
 
     for item in items:
         date = item.date_updated.strftime('%m/%d/%Y')
@@ -138,24 +140,24 @@ def search_inventory_name():
 def add_item():
     """Add an item to inventory"""
 
-    def print_database_keys(nm=None, qnt=None, pr=None):
-        if nm is None:
-            nm1 = ''
+    def print_database_keys(prod_name=None, prod_quantity=None, prod_price=None):
+        if prod_name is None:
+            prod_name1 = ''
         else:
-            nm1 = nm
-        if pr is None:
-            pr1 = ''
+            prod_name1 = prod_name
+        if prod_price is None:
+            prod_price1 = ''
         else:
-            pr1 = pr
-        if qnt is None:
-            qnt1 = ''
+            prod_price1 = prod_price
+        if prod_quantity is None:
+            prod_quantity1 = ''
         else:
-            qnt1 = qnt
+            prod_quantity1 = prod_quantity
 
         return print(f"""
-            {product_labels['n']} {nm1}
-            {product_labels['q']} {qnt1}
-            {product_labels['p']} {pr1}
+            {product_labels['n']} {prod_name1}
+            {product_labels['q']} {prod_quantity1}
+            {product_labels['p']} {prod_price1}
         """)
 
     clear()
@@ -175,9 +177,9 @@ def add_item():
             quantity = input(product_labels['q'])
             if return_to_menu(quantity):
                 menu_loop()
-            quantity = float(quantity)
+            quantity = int(quantity)
         except ValueError:
-            print('the quantity must be a number')
+            print('the quantity must be a whole number')
         else:
             print_database_keys(name, quantity)
             break
