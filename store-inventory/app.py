@@ -4,6 +4,7 @@ from collections import OrderedDict
 import datetime
 import os
 import csv
+import sys
 
 from peewee import *
 from playhouse.shortcuts import model_to_dict
@@ -69,6 +70,7 @@ def menu_loop():
         ('v', view_inventory),
         ('b', create_backup),
         ('s', search_inventory_name),
+        ('q', quit_inventory),
     ])
 
     while entry != 'q':
@@ -77,13 +79,15 @@ def menu_loop():
         print('-' * 16, '\n')
         for key, value in menu.items():
             print('{}: {}'.format(key, value.__doc__))
-        print('q: Quit', '\n')
+        print('\n')
         entry = input('What would you like to do?  ').lower().strip()
 
         try:
             if entry.lower() != 'q' and entry not in menu:
                 clear()
                 raise ValueError("That is not a valid entry")
+            elif entry.lower() == 'q':
+                quit_inventory()
             else:
                 clear()
                 menu[entry]()
@@ -242,6 +246,11 @@ def delete_item(item):
     if delete_check.lower() == 'y' or delete_check.lower() == 'yes':
         item.delete_instance()
         print('Entry deleted')
+
+
+def quit_inventory():
+    """Quit"""
+    sys.exit('I hope you have enjoyed your inventory experience')
 
 
 if __name__ == '__main__':
